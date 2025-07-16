@@ -22,6 +22,11 @@ ADSR ampEnv;
 AudioSource* currentWave = &sineWave;
 
 void setup() {
+    // Initialize all buffers to zero
+    memset(&sineWave, 0, sizeof(sineWave));
+    memset(&sawWave, 0, sizeof(sawWave));
+    memset(&squareWave, 0, sizeof(squareWave));
+
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
   

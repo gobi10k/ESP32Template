@@ -65,22 +65,24 @@ public:
   void renderBlock() {
     if (!active) return;
 
+    // Add null checks
+    if (!output) return;
+
     uint32_t start = GET_CYCLE_COUNT();
 
     // Update modulation engine
     modEngine.update((float)BLOCK_SIZE / sampleRate);
 
-    float mixBuffer[BLOCK_SIZE] = {0.0f};
+    memset(mixBuffer, 0, sizeof(mixBuffer));
 
     // Render sources
     {
       std::lock_guard<std::mutex> lock(mutex);
       for (size_t i = 0; i < numSources; ++i) {
         if (sources[i]) {
-            float sourceBuffer[BLOCK_SIZE];
-            sources[i]->renderBlock(sourceBuffer, BLOCK_SIZE);
+            sources[i]->renderBlock(sourceBuffers[i], BLOCK_SIZE);
             for (size_t j = 0; j < BLOCK_SIZE; j++) {
-              mixBuffer[j] += sourceBuffer[j];
+              mixBuffer[j] += sourceBuffers[i][j];
             }
         }
       }
@@ -178,6 +180,10 @@ public:
   float getCpuUsage() const { return cpuUsage; }
 
 private:
+    // Replace stack-allocated buffers with member variables
+    float mixBuffer[BLOCK_SIZE];
+    float sourceBuffers[MAX_SOURCES][BLOCK_SIZE]; // For all sources
+
     // Replace vectors with fixed-size arrays if you have a known maximum
     static constexpr size_t MAX_SOURCES = 8;
     static constexpr size_t MAX_EFFECTS = 4;
