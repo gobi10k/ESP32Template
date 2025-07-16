@@ -9,7 +9,15 @@
 #include <cmath>
 #include "ModulationEngine.h"
 
+#if defined(ESP32)
+#include <xtensa/hal.h>
+#define GET_CYCLE_COUNT() xthal_get_ccount()
+#else
+#define GET_CYCLE_COUNT() 0
+#endif
+
 #define BLOCK_SIZE 64
+#define CYCLES_PER_SAMPLE (F_CPU / 44100.0f)
 
 class AudioSource {
 public:
@@ -36,7 +44,7 @@ public:
 class AudioEngine {
 public:
   AudioEngine(AudioOutput& output) : output(output), sampleRate(44100.0f),
-                                    active(false), peakLevel(0.0f), rmsLevel(0.0f) {}
+                                    active(false), peakLevel(0.0f), rmsLevel(0.0f), cpuUsage(0.0f) {}
 
   ModulationEngine& getModulationEngine() { return modEngine; }
 
@@ -56,6 +64,8 @@ public:
 
   void renderBlock() {
     if (!active) return;
+
+    uint32_t start = GET_CYCLE_COUNT();
 
     // Update modulation engine
     modEngine.update((float)BLOCK_SIZE / sampleRate);
@@ -95,6 +105,9 @@ public:
 
     // Write to output
     output.writeBlock(mixBuffer);
+
+    uint32_t end = GET_CYCLE_COUNT();
+    cpuUsage = (end - start) / (BLOCK_SIZE * CYCLES_PER_SAMPLE);
   }
 
   void addSource(AudioSource* src) {
@@ -134,6 +147,7 @@ public:
 
   float getPeakLevel() const { return peakLevel; }
   float getRMSLevel() const { return rmsLevel; }
+  float getCpuUsage() const { return cpuUsage; }
 
 private:
   AudioOutput& output;
@@ -145,6 +159,7 @@ private:
   bool active;
   float peakLevel;
   float rmsLevel;
+  float cpuUsage;
 };
 
 #endif

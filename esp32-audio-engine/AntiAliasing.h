@@ -3,6 +3,7 @@
 #define ANTI_ALIASING_H
 
 #include <cmath>
+#include <vector>
 
 class AntiAliasing {
 public:
@@ -22,6 +23,34 @@ public:
         } else {
             // No correction needed
             return 0.0f;
+        }
+    }
+};
+
+// Add oversampled processing
+template<int OVERSAMPLE>
+class OversampledOscillator {
+public:
+    void process(float* output, int numSamples) {
+        std::vector<float> osBuffer(OVERSAMPLE * numSamples);
+        // Process at higher sample rate
+        for(int i=0; i<OVERSAMPLE*numSamples; i++) {
+            osBuffer[i] = generateSample();
+        }
+        // Decimate with FIR filter
+        decimate(osBuffer.data(), output, numSamples);
+    }
+
+    // These would be implemented in a derived class
+    virtual float generateSample() { return 0.0f; }
+    virtual void decimate(float* in, float* out, int numSamples) {
+        // Simple boxcar decimation for now, replace with proper FIR
+        for (int i = 0; i < numSamples; ++i) {
+            float sum = 0;
+            for (int j = 0; j < OVERSAMPLE; ++j) {
+                sum += in[i * OVERSAMPLE + j];
+            }
+            out[i] = sum / OVERSAMPLE;
         }
     }
 };

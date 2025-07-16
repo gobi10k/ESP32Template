@@ -20,11 +20,13 @@ public:
   void setSmoothingTime(float timeInSeconds) {
     smoothingTime = timeInSeconds;
     if (sampleRate > 0 && timeInSeconds > 0) {
-      smoothingFactor = 1.0f - expf(-1.0f / (smoothingTime * sampleRate));
+        // Fast exp approximation: 1 - exp(-x) ≈ x/(x+1)
+        float x = 1.0f / (smoothingTime * sampleRate);
+        smoothingFactor = x / (x + 1.0f);
     } else {
-      smoothingFactor = 1.0f; // Immediate change
+        smoothingFactor = 1.0f;
     }
-  }
+}
 
   void setTarget(float newTarget) {
     target = newTarget;
