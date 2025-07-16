@@ -66,7 +66,7 @@ public:
     if (!active) return;
 
     // Add null checks
-    if (!output) return;
+    if (&output == nullptr) return;
 
     uint32_t start = GET_CYCLE_COUNT();
 
@@ -180,13 +180,13 @@ public:
   float getCpuUsage() const { return cpuUsage; }
 
 private:
-    // Replace stack-allocated buffers with member variables
-    float mixBuffer[BLOCK_SIZE];
-    float sourceBuffers[MAX_SOURCES][BLOCK_SIZE]; // For all sources
-
     // Replace vectors with fixed-size arrays if you have a known maximum
     static constexpr size_t MAX_SOURCES = 8;
     static constexpr size_t MAX_EFFECTS = 4;
+
+    // Replace stack-allocated buffers with member variables
+    float mixBuffer[BLOCK_SIZE];
+    float sourceBuffers[MAX_SOURCES][BLOCK_SIZE]; // For all sources
 
     AudioSource* sources[MAX_SOURCES];
     size_t numSources = 0;
