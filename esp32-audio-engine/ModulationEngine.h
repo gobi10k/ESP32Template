@@ -53,6 +53,7 @@ void ModulationEngine::addRoute(ModulationSource* src, float* targetParam, float
 }
 
 void ModulationEngine::removeRoute(ModulationSource* src, float* targetParam) {
+    if (!src || !targetParam) return;
     routes.erase(std::remove_if(routes.begin(), routes.end(),
         [this, src, targetParam](const ModulationRoute& route) {
             if (route.source == src && route.targetParam == targetParam) {
@@ -76,6 +77,7 @@ void ModulationEngine::removeRoute(ModulationSource* src, float* targetParam) {
 void ModulationEngine::clearRoutes() {
     routes.clear();
     baseValues.clear();
+    sources.clear();
 }
 
 void ModulationEngine::update(float dt) {
