@@ -23,10 +23,10 @@ public:
     void renderBlock(float* buffer, size_t blockSize) override {
         for (size_t i = 0; i < blockSize; i++) {
             float freq = frequency.next();
+            freq = std::min(freq, sampleRate * 0.49f); // Nyquist limit
 
             float dt = freq / sampleRate;
-            phase += dt;
-            if (phase >= 1.0f) phase -= 1.0f;
+            phase = fmodf(phase + dt, 1.0f);
 
             float raw_saw = 2.0f * phase - 1.0f;
             float correction = AntiAliasing::poly_blep(phase, dt);
