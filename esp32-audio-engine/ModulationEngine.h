@@ -58,13 +58,28 @@ void ModulationEngine::addRoute(ModulationSource* src, float* targetParam, float
 
 void ModulationEngine::removeRoute(ModulationSource* src, float* targetParam) {
     routes.erase(std::remove_if(routes.begin(), routes.end(),
-        [src, targetParam](const ModulationRoute& route) {
-            return route.source == src && route.targetParam == targetParam;
+        [this, src, targetParam](const ModulationRoute& route) {
+            if (route.source == src && route.targetParam == targetParam) {
+                // If this is the last route for this param, remove from baseValues
+                bool isLastRoute = true;
+                for (const auto& otherRoute : routes) {
+                    if (&otherRoute != &route && otherRoute.targetParam == targetParam) {
+                        isLastRoute = false;
+                        break;
+                    }
+                }
+                if (isLastRoute) {
+                    baseValues.erase(targetParam);
+                }
+                return true;
+            }
+            return false;
         }), routes.end());
 }
 
 void ModulationEngine::clearRoutes() {
     routes.clear();
+    baseValues.clear();
 }
 
 void ModulationEngine::update(float dt) {
@@ -75,7 +90,9 @@ void ModulationEngine::update(float dt) {
 
     // Reset all modulated parameters to their base values
     for (auto const& [param, baseValue] : baseValues) {
-        *param = baseValue;
+        if(param) {
+            *param = baseValue;
+        }
     }
 
     // 2. Apply modulation (additive instead of replacement)
