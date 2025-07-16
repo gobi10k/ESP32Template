@@ -42,30 +42,39 @@ public:
 
     void update(float dt) override {
         switch (state) {
-            case ATTACK:
-                value += dt / attackTime;
+            case ATTACK: {
+                float progress = value / 1.0f;
+                float curveFactor = 1.0f + (attackCurve * 3.0f * (1.0f - progress));
+                value += (dt / attackTime) * curveFactor;
                 if (value >= 1.0f) {
                     value = 1.0f;
                     state = DECAY;
                 }
                 break;
-            case DECAY:
-                value -= dt / decayTime;
+            }
+            case DECAY: {
+                float progress = (value - sustainLevel) / (1.0f - sustainLevel);
+                float curveFactor = 1.0f + (decayCurve * 3.0f * progress);
+                value -= (dt / decayTime) * curveFactor;
                 if (value <= sustainLevel) {
                     value = sustainLevel;
                     state = SUSTAIN;
                 }
                 break;
+            }
             case SUSTAIN:
                 // Do nothing, value stays at sustainLevel
                 break;
-            case RELEASE:
-                value -= dt / releaseTime;
+            case RELEASE: {
+                float progress = value / sustainLevel;
+                float curveFactor = 1.0f + (releaseCurve * 3.0f * progress);
+                value -= (dt / releaseTime) * curveFactor;
                 if (value <= 0.0f) {
                     value = 0.0f;
                     state = IDLE;
                 }
                 break;
+            }
             case IDLE:
                 break;
         }
@@ -79,6 +88,10 @@ public:
     return (state == IDLE) ? 0.0f : value; // Force 0 when inactive
 }
 
+    void setAttackCurve(float curve) { attackCurve = curve; } // 0=linear, 1=exponential
+    void setDecayCurve(float curve) { decayCurve = curve; }
+    void setReleaseCurve(float curve) { releaseCurve = curve; }
+
 private:
     State state;
     float value;
@@ -87,6 +100,9 @@ private:
     float sustainLevel;
     float releaseTime;
     float sampleRate;
+    float attackCurve = 0.0f;
+    float decayCurve = 0.0f;
+    float releaseCurve = 0.0f;
 };
 
 #endif // ADSR_H

@@ -38,14 +38,16 @@ public:
   }
 
   void writeBlock(float* buffer) override {
-    // Convert to 16-bit PCM (DAC expects 8-bit but I2S upsamples)
+    // Use IRAM_ATTR for critical audio path
+    // Apply dithering for 8-bit DAC
     int16_t pcmBuffer[BLOCK_SIZE];
     for (size_t i = 0; i < BLOCK_SIZE; i++) {
-      pcmBuffer[i] = static_cast<int16_t>(buffer[i] * 32767.0f);
+        float dithered = buffer[i] + (rand()/(float)RAND_MAX - 0.5f)/128.0f;
+        pcmBuffer[i] = static_cast<int16_t>(dithered * 32767.0f);
     }
 
-    size_t bytesWritten;
-    i2s_write(I2S_NUM, pcmBuffer, BLOCK_SIZE * sizeof(int16_t), &bytesWritten, portMAX_DELAY);
+    // Consider using DMA double buffering
+    i2s_write(I2S_NUM, pcmBuffer, sizeof(pcmBuffer), nullptr, portMAX_DELAY);
   }
 
 private:

@@ -4,6 +4,8 @@
 
 #include <vector>
 #include <cmath>
+#include <map>
+#include <algorithm>
 
 // Forward declarations
 class ModulationSource;
@@ -17,12 +19,16 @@ struct ModulationRoute {
 class ModulationEngine {
 public:
     void addSource(ModulationSource* src);
+    void removeSource(ModulationSource* src);
     void addRoute(ModulationSource* src, float* targetParam, float depth);
+    void removeRoute(ModulationSource* src, float* targetParam);
+    void clearRoutes();
     void update(float dt);
 
 private:
     std::vector<ModulationSource*> sources;
     std::vector<ModulationRoute> routes;
+    std::map<float*, float> baseValues;
 };
 
 class ModulationSource {
@@ -38,8 +44,27 @@ void ModulationEngine::addSource(ModulationSource* src) {
     sources.push_back(src);
 }
 
+void ModulationEngine::removeSource(ModulationSource* src) {
+    sources.erase(std::remove(sources.begin(), sources.end(), src), sources.end());
+}
+
 void ModulationEngine::addRoute(ModulationSource* src, float* targetParam, float depth) {
+    // Store the base value if it's not already tracked
+    if (baseValues.find(targetParam) == baseValues.end()) {
+        baseValues[targetParam] = *targetParam;
+    }
     routes.push_back({src, depth, targetParam});
+}
+
+void ModulationEngine::removeRoute(ModulationSource* src, float* targetParam) {
+    routes.erase(std::remove_if(routes.begin(), routes.end(),
+        [src, targetParam](const ModulationRoute& route) {
+            return route.source == src && route.targetParam == targetParam;
+        }), routes.end());
+}
+
+void ModulationEngine::clearRoutes() {
+    routes.clear();
 }
 
 void ModulationEngine::update(float dt) {
@@ -48,10 +73,15 @@ void ModulationEngine::update(float dt) {
         src->update(dt);
     }
 
-    // 2. Apply modulation (replace target value completely)
+    // Reset all modulated parameters to their base values
+    for (auto const& [param, baseValue] : baseValues) {
+        *param = baseValue;
+    }
+
+    // 2. Apply modulation (additive instead of replacement)
     for (auto& route : routes) {
         if (route.source && route.targetParam) {
-            *route.targetParam = route.source->getValue() * route.depth;
+            *route.targetParam += route.source->getValue() * route.depth;
         }
     }
 }

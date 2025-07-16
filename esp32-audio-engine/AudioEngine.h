@@ -75,11 +75,11 @@ public:
     // Render sources
     {
       std::lock_guard<std::mutex> lock(mutex);
-      for (auto source : sources) {
+      for (size_t i = 0; i < numSources; ++i) {
         float sourceBuffer[BLOCK_SIZE];
-        source->renderBlock(sourceBuffer, BLOCK_SIZE);
-        for (size_t i = 0; i < BLOCK_SIZE; i++) {
-          mixBuffer[i] += sourceBuffer[i];
+        sources[i]->renderBlock(sourceBuffer, BLOCK_SIZE);
+        for (size_t j = 0; j < BLOCK_SIZE; j++) {
+          mixBuffer[j] += sourceBuffer[j];
         }
       }
     }
@@ -87,8 +87,8 @@ public:
     // Apply effects
     {
       std::lock_guard<std::mutex> lock(mutex);
-      for (auto effect : effects) {
-        effect->processBlock(mixBuffer, BLOCK_SIZE);
+      for (size_t i = 0; i < numEffects; ++i) {
+        effects[i]->processBlock(mixBuffer, BLOCK_SIZE);
       }
     }
 
@@ -112,37 +112,57 @@ public:
 
   void addSource(AudioSource* src) {
     std::lock_guard<std::mutex> lock(mutex);
-    src->setSampleRate(sampleRate);
-    sources.push_back(src);
+    if (numSources < MAX_SOURCES) {
+        src->setSampleRate(sampleRate);
+        sources[numSources++] = src;
+    }
   }
 
   void removeSource(AudioSource* src) {
     std::lock_guard<std::mutex> lock(mutex);
-    auto it = std::find(sources.begin(), sources.end(), src);
-    if (it != sources.end()) {
-      sources.erase(it);
+    for (size_t i = 0; i < numSources; ++i) {
+        if (sources[i] == src) {
+            // Shift remaining elements down
+            for (size_t j = i; j < numSources - 1; ++j) {
+                sources[j] = sources[j + 1];
+            }
+            numSources--;
+            return;
+        }
     }
   }
 
   void addEffect(AudioEffect* fx) {
     std::lock_guard<std::mutex> lock(mutex);
-    fx->setSampleRate(sampleRate);
-    effects.push_back(fx);
+    if (numEffects < MAX_EFFECTS) {
+        fx->setSampleRate(sampleRate);
+        effects[numEffects++] = fx;
+    }
   }
 
   void removeEffect(AudioEffect* fx) {
     std::lock_guard<std::mutex> lock(mutex);
-    auto it = std::find(effects.begin(), effects.end(), fx);
-    if (it != effects.end()) {
-      effects.erase(it);
+    for (size_t i = 0; i < numEffects; ++i) {
+        if (effects[i] == fx) {
+            // Shift remaining elements down
+            for (size_t j = i; j < numEffects - 1; ++j) {
+                effects[j] = effects[j + 1];
+            }
+            numEffects--;
+            return;
+        }
     }
   }
 
   void setSampleRate(float sr) {
     std::lock_guard<std::mutex> lock(mutex);
     sampleRate = sr;
-    for (auto source : sources) source->setSampleRate(sr);
-    for (auto effect : effects) effect->setSampleRate(sr);
+    for (size_t i = 0; i < numSources; ++i) {
+        sources[i]->setSampleRate(sr);
+    }
+    for (size_t i = 0; i < numEffects; ++i) {
+        effects[i]->setSampleRate(sr);
+    }
   }
 
   float getPeakLevel() const { return peakLevel; }
@@ -150,9 +170,17 @@ public:
   float getCpuUsage() const { return cpuUsage; }
 
 private:
+    // Replace vectors with fixed-size arrays if you have a known maximum
+    static constexpr size_t MAX_SOURCES = 8;
+    static constexpr size_t MAX_EFFECTS = 4;
+
+    AudioSource* sources[MAX_SOURCES];
+    size_t numSources = 0;
+
+    AudioEffect* effects[MAX_EFFECTS];
+    size_t numEffects = 0;
+
   AudioOutput& output;
-  std::vector<AudioSource*> sources;
-  std::vector<AudioEffect*> effects;
   ModulationEngine modEngine;
   std::mutex mutex;
   float sampleRate;

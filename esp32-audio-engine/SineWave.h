@@ -21,12 +21,13 @@ public:
     }
 
     void renderBlock(float* buffer, size_t blockSize) override {
+        // Replace sinf() with a more efficient alternative
         for (size_t i = 0; i < blockSize; i++) {
-            phase += 2.0f * M_PI * frequency.next() / sampleRate;
-            if (phase >= 2.0f * M_PI) phase -= 2.0f * M_PI;
+            phase += frequency.next() / sampleRate;
+            if (phase >= 1.0f) phase -= 1.0f;
             
-            // Use the direct envelope value from ADSR (no smoothing)
-            buffer[i] = sinf(phase) * baseAmplitude * envelopeValue;
+            // Fast sine approximation (5th order polynomial)
+            buffer[i] = fastSin(phase * 2.0f * M_PI) * baseAmplitude * envelopeValue;
         }
     }
 
@@ -46,6 +47,20 @@ public:
     float* getAmplitudePtr() { return &envelopeValue; }
 
 private:
+    float fastSin(float x) {
+        // Normalize to [0, 2π]
+        x = fmodf(x, 2.0f * M_PI);
+        if (x < 0) x += 2.0f * M_PI;
+
+        // 5th order polynomial approximation
+        const float B = 4.0f/M_PI;
+        const float C = -4.0f/(M_PI*M_PI);
+        const float P = 0.225f;
+
+        float y = B * x + C * x * fabsf(x);
+        return P * (y * fabsf(y) - y) + y;
+    }
+
     SmoothedParameter frequency;
     float baseAmplitude;
     float envelopeValue; // Direct envelope value from ADSR

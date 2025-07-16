@@ -27,32 +27,46 @@ public:
     }
 };
 
+#define BLOCK_SIZE 64
+
 // Add oversampled processing
 template<int OVERSAMPLE>
 class OversampledOscillator {
 public:
     void process(float* output, int numSamples) {
-        std::vector<float> osBuffer(OVERSAMPLE * numSamples);
+        float osBuffer[OVERSAMPLE * BLOCK_SIZE]; // Static allocation
+
         // Process at higher sample rate
         for(int i=0; i<OVERSAMPLE*numSamples; i++) {
-            osBuffer[i] = generateSample();
+            phase += phaseIncrementOS;
+            if (phase >= 1.0f) phase -= 1.0f;
+            osBuffer[i] = generateSample(phase);
         }
-        // Decimate with FIR filter
-        decimate(osBuffer.data(), output, numSamples);
+
+        // Better FIR decimation
+        decimateFIR(osBuffer, output, numSamples);
     }
 
-    // These would be implemented in a derived class
-    virtual float generateSample() { return 0.0f; }
-    virtual void decimate(float* in, float* out, int numSamples) {
-        // Simple boxcar decimation for now, replace with proper FIR
-        for (int i = 0; i < numSamples; ++i) {
+protected:
+    virtual float generateSample(float phase) = 0;
+
+private:
+    void decimateFIR(float* in, float* out, int numSamples) {
+        // Implement proper FIR filter here
+        // Example coefficients for 4x oversampling
+        static const float firCoeffs[16] = { 0.026, 0.054, 0.082, 0.109, 0.13, 0.148, 0.159, 0.165, 0.165, 0.159, 0.148, 0.13, 0.109, 0.082, 0.054, 0.026 };
+
+        for (int i = 0; i < numSamples; i++) {
             float sum = 0;
-            for (int j = 0; j < OVERSAMPLE; ++j) {
-                sum += in[i * OVERSAMPLE + j];
+            for (int j = 0; j < 16; j++) {
+                sum += in[i*OVERSAMPLE + j] * firCoeffs[j];
             }
-            out[i] = sum / OVERSAMPLE;
+            out[i] = sum;
         }
     }
+
+    float phase = 0.0f;
+    float phaseIncrementOS = 0.0f;
 };
 
 #endif
