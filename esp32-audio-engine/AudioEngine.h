@@ -76,10 +76,12 @@ public:
     {
       std::lock_guard<std::mutex> lock(mutex);
       for (size_t i = 0; i < numSources; ++i) {
-        float sourceBuffer[BLOCK_SIZE];
-        sources[i]->renderBlock(sourceBuffer, BLOCK_SIZE);
-        for (size_t j = 0; j < BLOCK_SIZE; j++) {
-          mixBuffer[j] += sourceBuffer[j];
+        if (sources[i]) {
+            float sourceBuffer[BLOCK_SIZE];
+            sources[i]->renderBlock(sourceBuffer, BLOCK_SIZE);
+            for (size_t j = 0; j < BLOCK_SIZE; j++) {
+              mixBuffer[j] += sourceBuffer[j];
+            }
         }
       }
     }
@@ -88,7 +90,9 @@ public:
     {
       std::lock_guard<std::mutex> lock(mutex);
       for (size_t i = 0; i < numEffects; ++i) {
-        effects[i]->processBlock(mixBuffer, BLOCK_SIZE);
+        if (effects[i]) {
+            effects[i]->processBlock(mixBuffer, BLOCK_SIZE);
+        }
       }
     }
 
@@ -158,10 +162,14 @@ public:
     std::lock_guard<std::mutex> lock(mutex);
     sampleRate = sr;
     for (size_t i = 0; i < numSources; ++i) {
-        sources[i]->setSampleRate(sr);
+        if(sources[i]) {
+            sources[i]->setSampleRate(sr);
+        }
     }
     for (size_t i = 0; i < numEffects; ++i) {
-        effects[i]->setSampleRate(sr);
+        if(effects[i]) {
+            effects[i]->setSampleRate(sr);
+        }
     }
   }
 
