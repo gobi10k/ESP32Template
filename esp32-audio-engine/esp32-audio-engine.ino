@@ -1,8 +1,6 @@
 #include "AudioEngine.h"
 #include "DACOutput.h"
-#include "SineWave.h"
-#include "SawWave.h"
-#include "SquareWave.h"
+#include "WavetableSynth.h"
 #include "Limiter.h"
 #include "ADSR.h"
 
@@ -13,21 +11,17 @@
 
 DACOutput dacOutput;
 AudioEngine audioEngine(dacOutput);
-SineWave sineWave;
-SawWave sawWave;
-SquareWave squareWave;
+WavetableSynth wtSynth;
 Limiter limiter(0.95f, 0.005f);
 ADSR ampEnv;
-
-AudioSource* currentWave = &sineWave;
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
   
   Serial.begin(115200);
-  Serial.println("ESP32 Professional Audio Engine");
-  Serial.println("Commands: start, stop, freq <f>[i], amp <a>[i], wave <sine|saw|square>, noteon, noteoff, peak, rms, stats");
+  Serial.println("ESP32 Wavetable Synth Engine");
+  Serial.println("Commands: start, stop, freq <f>, pos <p>, morph <m>, noteon, noteoff, peak, rms, stats");
 
   // Setup ADSR
   ampEnv.setAttack(0.01f);
@@ -36,25 +30,25 @@ void setup() {
   ampEnv.setRelease(1.0f);
   ampEnv.setSampleRate(44100.0f);
 
-  // Setup waveforms - all start with 0 amplitude by default
+  // Setup Wavetable Synth
+  wtSynth.generateSineWavetable();      // Position 0
+  wtSynth.generateTriangleWavetable();  // Position 1
+  wtSynth.generateSquareWavetable();    // Position 2
+  wtSynth.generateSawWavetable();       // Position 3
+  wtSynth.generateComplexWaveform(0b0000010101); // Position 4 (organ-like)
+  wtSynth.generateComplexWaveform(0b1111111111); // Position 5 (rich harmonics)
 
   // Setup modulation
   ModulationEngine& modEngine = audioEngine.getModulationEngine();
   modEngine.addSource(&ampEnv);
-  modEngine.addRoute(&ampEnv, sineWave.getAmplitudePtr(), 1.0f);
-  modEngine.addRoute(&ampEnv, sawWave.getAmplitudePtr(), 1.0f);
-  modEngine.addRoute(&ampEnv, squareWave.getAmplitudePtr(), 1.0f);
-  
+  modEngine.addRoute(&ampEnv, wtSynth.getGainPtr(), 1.0f);
+
   // Add sources and effects to audio engine
-  audioEngine.addSource(&sineWave);
-  audioEngine.addSource(&sawWave);
-  audioEngine.addSource(&squareWave);
+  audioEngine.addSource(&wtSynth);
   audioEngine.addEffect(&limiter);
 
-  // Start with sine wave active, and others inactive
   ampEnv.noteOff(); // Ensure envelope is off
-  sineWave.setAmplitude(1.0f);
-
+  wtSynth.setFrequency(440.0f);
 
   audioEngine.start();
 }
@@ -67,57 +61,37 @@ void processCommand(const String& command) {
     audioEngine.stop();
     Serial.println("Engine stopped");
   } else if (command.startsWith("freq")) {
-    bool immediate = command.endsWith("i");
-    String valueStr = command.substring(5, immediate ? command.length() - 1 : command.length());
+    String valueStr = command.substring(5);
     float freq = valueStr.toFloat();
     if (freq >= 20.0f && freq <= 20000.0f) {
-      sineWave.setFrequency(freq, immediate);
-      sawWave.setFrequency(freq, immediate);
-      squareWave.setFrequency(freq, immediate);
+      wtSynth.setFrequency(freq);
       Serial.print("Frequency set to: ");
-      Serial.print(freq);
-      Serial.println(immediate ? " (immediate)" : " (smoothed)");
+      Serial.println(freq);
     } else {
       Serial.println("Invalid frequency (20-20000Hz)");
     }
-  } else if (command.startsWith("amp") || command.startsWith("a ")) {
-    String valueStr = command.substring(command.indexOf(' ') + 1);
-    float amp = valueStr.toFloat();
-    if (amp >= 0.0f && amp <= 1.0f) {
-      sineWave.setAmplitude(amp);
-      sawWave.setAmplitude(amp);
-      squareWave.setAmplitude(amp);
-      Serial.print("Base amplitude set to: ");
-      Serial.println(amp);
+  } else if (command.startsWith("pos")) {
+    String valueStr = command.substring(4);
+    float pos = valueStr.toFloat();
+    if (pos >= 0.0f && pos <= 5.0f) { // 6 wavetables
+      wtSynth.setPosition(pos);
+      Serial.print("Position set to: ");
+      Serial.println(pos);
     } else {
-      Serial.println("Invalid amplitude (0.0-1.0)");
+      Serial.println("Invalid position (0.0-5.0)");
     }
-  } else if (command.startsWith("wave")) {
-    String waveType = command.substring(5);
-    waveType.trim();
-
-    if (waveType == "sine") {
-      currentWave = &sineWave;
-      sineWave.setAmplitude(1.0f);
-      sawWave.setAmplitude(0.0f);
-      squareWave.setAmplitude(0.0f);
-      Serial.println("Waveform set to Sine");
-    } else if (waveType == "saw") {
-      currentWave = &sawWave;
-      sineWave.setAmplitude(0.0f);
-      sawWave.setAmplitude(1.0f);
-      squareWave.setAmplitude(0.0f);
-      Serial.println("Waveform set to Saw");
-    } else if (waveType == "square") {
-      currentWave = &squareWave;
-      sineWave.setAmplitude(0.0f);
-      sawWave.setAmplitude(0.0f);
-      squareWave.setAmplitude(1.0f);
-      Serial.println("Waveform set to Square");
+  } else if (command.startsWith("morph")) {
+    String valueStr = command.substring(6);
+    float morph = valueStr.toFloat();
+    if (morph >= 0.0f && morph <= 1.0f) {
+      wtSynth.setMorph(morph);
+      Serial.print("Morph set to: ");
+      Serial.println(morph);
     } else {
-      Serial.println("Unknown waveform. Use sine, saw, or square.");
+      Serial.println("Invalid morph (0.0-1.0)");
     }
-  } else if (command == "noteon") {
+  }
+  else if (command == "noteon") {
     ampEnv.noteOn();
     Serial.println("Note On");
   } else if (command == "noteoff") {
