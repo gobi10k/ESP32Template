@@ -6,6 +6,7 @@
 #include <cmath>
 #include <map>
 #include <algorithm>
+#include "SmoothedParameter.h"
 
 // Forward declarations
 class ModulationSource;
@@ -13,22 +14,22 @@ class ModulationSource;
 struct ModulationRoute {
     ModulationSource* source;
     float depth;
-    float* targetParam;
+    SmoothedParameter* targetParam;
 };
 
 class ModulationEngine {
 public:
     void addSource(ModulationSource* src);
     void removeSource(ModulationSource* src);
-    void addRoute(ModulationSource* src, float* targetParam, float depth);
-    void removeRoute(ModulationSource* src, float* targetParam);
+    void addRoute(ModulationSource* src, SmoothedParameter& targetParam, float depth);
+    void removeRoute(ModulationSource* src, SmoothedParameter& targetParam);
     void clearRoutes();
     void update(float dt);
 
 private:
     std::vector<ModulationSource*> sources;
     std::vector<ModulationRoute> routes;
-    std::map<float*, float> baseValues;
+    std::map<SmoothedParameter*, float> baseValues;
 };
 
 class ModulationSource {
@@ -48,28 +49,28 @@ void ModulationEngine::removeSource(ModulationSource* src) {
     sources.erase(std::remove(sources.begin(), sources.end(), src), sources.end());
 }
 
-void ModulationEngine::addRoute(ModulationSource* src, float* targetParam, float depth) {
+void ModulationEngine::addRoute(ModulationSource* src, SmoothedParameter& targetParam, float depth) {
     // Store the base value if it's not already tracked
-    if (baseValues.find(targetParam) == baseValues.end()) {
-        baseValues[targetParam] = *targetParam;
+    if (baseValues.find(&targetParam) == baseValues.end()) {
+        baseValues[&targetParam] = targetParam.getTarget();
     }
-    routes.push_back({src, depth, targetParam});
+    routes.push_back({src, depth, &targetParam});
 }
 
-void ModulationEngine::removeRoute(ModulationSource* src, float* targetParam) {
+void ModulationEngine::removeRoute(ModulationSource* src, SmoothedParameter& targetParam) {
     routes.erase(std::remove_if(routes.begin(), routes.end(),
-        [this, src, targetParam](const ModulationRoute& route) {
-            if (route.source == src && route.targetParam == targetParam) {
+        [this, src, &targetParam](const ModulationRoute& route) {
+            if (route.source == src && route.targetParam == &targetParam) {
                 // If this is the last route for this param, remove from baseValues
                 bool isLastRoute = true;
                 for (const auto& otherRoute : routes) {
-                    if (&otherRoute != &route && otherRoute.targetParam == targetParam) {
+                    if (&otherRoute != &route && otherRoute.targetParam == &targetParam) {
                         isLastRoute = false;
                         break;
                     }
                 }
                 if (isLastRoute) {
-                    baseValues.erase(targetParam);
+                    baseValues.erase(&targetParam);
                 }
                 return true;
             }
@@ -91,14 +92,15 @@ void ModulationEngine::update(float dt) {
     // Reset all modulated parameters to their base values
     for (auto const& [param, baseValue] : baseValues) {
         if(param) {
-            *param = baseValue;
+            param->setTarget(baseValue);
         }
     }
 
     // 2. Apply modulation (additive instead of replacement)
     for (auto& route : routes) {
         if (route.source && route.targetParam) {
-            *route.targetParam += route.source->getValue() * route.depth;
+            float currentValue = route.targetParam->getTarget();
+            route.targetParam->setTarget(currentValue + route.source->getValue() * route.depth);
         }
     }
 }

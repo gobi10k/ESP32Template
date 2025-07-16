@@ -44,7 +44,7 @@ public:
         // Don't modify modulatedAmplitude here - it's controlled by ADSR
     }
 
-    float* getAmplitudePtr() { return &envelopeValue; }
+    float* getAmplitudePtr() { return &baseAmplitude; }
 
 private:
     float fastSin(float x) {

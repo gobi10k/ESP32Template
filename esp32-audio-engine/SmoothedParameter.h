@@ -56,10 +56,6 @@ public:
     return target;
   }
 
-  float* getPtr() {
-      return &current;
-  }
-
 private:
   float current;
   float target;
