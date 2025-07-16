@@ -37,6 +37,9 @@ void setup() {
   ampEnv.setSampleRate(44100.0f);
 
   // Setup waveforms - all start with 0 amplitude by default
+  sineWave.setSampleRate(44100.0f);
+  sawWave.setSampleRate(44100.0f);
+  squareWave.setSampleRate(44100.0f);
 
   // Setup modulation
   ModulationEngine& modEngine = audioEngine.getModulationEngine();

@@ -45,6 +45,7 @@ void ModulationEngine::addSource(ModulationSource* src) {
 }
 
 void ModulationEngine::addRoute(ModulationSource* src, float* targetParam, float depth) {
+       if (!src || !targetParam) return;  // Skip invalid routes
     if (baseValues.find(targetParam) == baseValues.end()) {
         baseValues[targetParam] = *targetParam;
     }
